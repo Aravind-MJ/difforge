@@ -115,6 +115,31 @@ fn page_up_and_page_down_always_scroll_the_diff() {
 }
 
 #[test]
+fn dump_scroll_stops_when_the_last_line_is_on_screen() {
+    let session = session_changed(&[(" M", "a.rs")]);
+    let (mut session, _) = key(session, Key::Tab);
+    let mut last = session.diff_scroll();
+    for _ in 0..200 {
+        let (next, _) = key(session, ch('j'));
+        if next.diff_scroll() == last {
+            session = next;
+            break;
+        }
+        last = next.diff_scroll();
+        session = next;
+    }
+    let (session, _) = key(session, ch('j'));
+    assert_eq!(session.diff_scroll(), last);
+    let lines = session.pane_body().lines().count() as u16;
+    let visible = ROWS.saturating_sub(1);
+    assert_eq!(
+        last,
+        lines.saturating_sub(visible),
+        "scroll {last} should leave the last line in a {visible}-row pane of {lines} lines"
+    );
+}
+
+#[test]
 fn rest_footer_names_what_the_keys_do() {
     let session = session_changed(&[(" M", "a.rs")]);
     let footer = session.footer_text();

@@ -23,6 +23,19 @@ fn r_reloads_porcelain_and_the_current_dump() {
 }
 
 #[test]
+fn tick_keeps_diff_scroll_when_the_selected_path_is_unchanged() {
+    let session = session_changed(&[(" M", "a.rs")]);
+    let (session, _) = key(session, Key::PageDown);
+    let scrolled = session.diff_scroll();
+    assert!(scrolled > 0, "page down should leave the dump scrolled");
+    let (session, effects) = apply(session, Event::Tick);
+    let (session, _) = finish_refresh(session, effects, &[(" M", "a.rs")], &[], |_| {
+        common::tall_dump()
+    });
+    assert_eq!(session.diff_scroll(), scrolled);
+}
+
+#[test]
 fn tick_refreshes_when_idle_and_pauses_under_overlay_search_and_strip() {
     let session = session_changed(&[(" M", "a.rs")]);
     assert!(!session.poll_paused());

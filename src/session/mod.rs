@@ -73,6 +73,7 @@ pub struct Session {
     rows: Vec<FilesRow>,
     selected: Option<usize>,
     scroll: u16,
+    dump_scroll_path: Option<String>,
     pane_body: String,
     pane_text: Text<'static>,
     pane_lines: u16,
@@ -107,6 +108,7 @@ impl Session {
             rows: Vec::new(),
             selected: None,
             scroll: 0,
+            dump_scroll_path: None,
             pane_body: String::new(),
             pane_text: Text::default(),
             pane_lines: 0,
@@ -440,7 +442,11 @@ impl Session {
     }
 
     fn request_dumps(&mut self) -> Vec<Effect> {
-        self.scroll = 0;
+        let path = self.selected_path().map(str::to_string);
+        if path != self.dump_scroll_path {
+            self.scroll = 0;
+            self.dump_scroll_path = path;
+        }
         let width = self.pane_width();
         let plan = self.current_plan();
         let mut effects = Vec::new();
@@ -710,7 +716,12 @@ impl Session {
     }
 
     fn clamp_scroll(&mut self) {
-        let max = self.pane_lines.saturating_sub(1);
+        let visible = self
+            .term_rows
+            .saturating_sub(1)
+            .saturating_sub(self.overlay_height())
+            .max(1);
+        let max = self.pane_lines.saturating_sub(visible);
         if self.scroll > max {
             self.scroll = max;
         }
