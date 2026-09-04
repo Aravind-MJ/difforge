@@ -1,0 +1,24 @@
+[package]
+name = "difforge"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "MIT"
+authors = ["Aravind M J"]
+repository = "https://github.com/Aravind-MJ/difforge"
+homepage = "https://github.com/Aravind-MJ/difforge"
+readme = "README.md"
+keywords = ["git", "tui", "diff", "difftastic"]
+categories = ["command-line-utilities", "development-tools"]
+description = "A full-screen git TUI whose file preview is a structural diff from difftastic"
+
+[[bin]]
+name = "difforge"
+path = "src/main.rs"
+
+[dependencies]
+ansi-to-tui = "8.0.1"
+crossterm = "0.29"
+ratatui = "0.30"
+signal-hook = "0.3"
+unicode-width = "0.2"
