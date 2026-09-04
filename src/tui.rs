@@ -939,7 +939,6 @@ mod tests {
         let mut hits = Hits::default();
         terminal
             .draw(|frame| {
-                hits = Hits::default();
                 draw(frame, session, &mut hits);
             })
             .unwrap();
