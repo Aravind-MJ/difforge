@@ -35,6 +35,8 @@ const MUTED: Color = Color::Rgb(110, 110, 110);
 const POLL: Duration = Duration::from_secs(10);
 const DUMP_DEBOUNCE: Duration = Duration::from_millis(50);
 const REAP: Duration = Duration::from_millis(16);
+/// Columns the footer search field reserves for its `" /"` prefix.
+const SEARCH_PREFIX: u16 = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum DumpSide {
@@ -726,12 +728,23 @@ fn draw(frame: &mut Frame, session: &Session, hits: &mut Hits) {
     }
 
     if session.search_open() {
-        let search = format!(" /{}_ ", session.search_query());
-        hits.search = Some(footer);
+        let search = format!(" /{} ", session.search_query());
+        let field = Rect {
+            x: footer.x.saturating_add(SEARCH_PREFIX),
+            y: footer.y,
+            width: footer.width.saturating_sub(SEARCH_PREFIX),
+            height: footer.height,
+        };
+        hits.search = Some(field);
         frame.render_widget(
             Paragraph::new(search).style(Style::default().fg(BRASS)),
             footer,
         );
+        let caret = session.caret() as u16;
+        frame.set_cursor_position(Position::new(
+            field.x + caret.min(field.width.saturating_sub(1)),
+            field.y,
+        ));
     } else {
         frame.render_widget(Paragraph::new(session.footer_text()).style(Style::default().fg(MUTED)), footer);
     }
@@ -920,6 +933,19 @@ mod tests {
         terminal.backend().buffer().clone()
     }
 
+    fn render_hits(session: &Session) -> (Hits, Option<Position>) {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut hits = Hits::default();
+        terminal
+            .draw(|frame| {
+                draw(frame, session, &mut hits);
+            })
+            .unwrap();
+        let cursor = terminal.get_cursor_position().ok();
+        (hits, cursor)
+    }
+
     fn row_reversed(buf: &ratatui::buffer::Buffer, needle: &str) -> bool {
         for y in 0..buf.area.height {
             let mut line = String::new();
@@ -1079,5 +1105,35 @@ mod tests {
         );
         assert_eq!(out, b"Binary contents changed.\n");
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn search_field_maps_clicks_and_draws_the_caret_past_the_prefix() {
+        let session = session_with_files();
+        let (mut session, _) = apply(session, Event::Key(Key::Char { c: '/', ctrl: false }));
+        for c in "abc".chars() {
+            let (next, _) = apply(session, Event::Key(Key::Char { c, ctrl: false }));
+            session = next;
+        }
+
+        let (hits, cursor) = render_hits(&session);
+        let area = hits.search.expect("search hit area");
+        assert_eq!(area.x, SEARCH_PREFIX, "query starts after the ` /` prefix");
+
+        // Clicking the query's second visible column resolves to caret index 1.
+        let hit = map_mouse(
+            MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: area.x + 1,
+                row: area.y,
+                modifiers: KeyModifiers::NONE,
+            },
+            &hits,
+            &session,
+        );
+        assert_eq!(hit, Some(MouseHit::Search { col: 1 }));
+
+        // The caret sits at the end of "abc", offset past the prefix.
+        assert_eq!(cursor, Some(Position::new(area.x + 3, area.y)));
     }
 }
